@@ -1,0 +1,159 @@
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+let running = false;
+let player = {
+  x: 400,
+  y: 250,
+  size: 10,
+  speed: 4,
+  life: 100
+};
+let bullets = [];
+let enemies = [];
+let score = 0;
+let zone = {
+  x: 400,
+  y: 250,
+  radius: 240
+};
+
+const keys = {};
+
+document.addEventListener("keydown", e => keys[e.key.toLowerCase()] = true);
+document.addEventListener("keyup", e => keys[e.key.toLowerCase()] = false);
+
+// Start game
+function startGame() {
+  document.getElementById("menu").classList.add("hidden");
+  document.getElementById("hud").classList.remove("hidden");
+  running = true;
+  loop();
+}
+
+// Shoot bullets on click
+canvas.addEventListener("click", shoot);
+
+function shoot(e) {
+  const rect = canvas.getBoundingClientRect();
+  const angle = Math.atan2(
+    e.clientY - rect.top - player.y,
+    e.clientX - rect.left - player.x
+  );
+
+  bullets.push({
+    x: player.x,
+    y: player.y,
+    dx: Math.cos(angle) * 6,
+    dy: Math.sin(angle) * 6
+  });
+}
+
+// Spawn enemies at random intervals
+function spawnEnemy() {
+  enemies.push({
+    x: Math.random() * canvas.width,
+    y: Math.random() * canvas.height,
+    size: 12,
+    speed: 1.2
+  });
+}
+
+setInterval(spawnEnemy, 1500);
+
+// Shrink zone over time
+setInterval(() => zone.radius -= 2, 5000);
+
+function update() {
+  if (running) {
+    // Move player
+    if (keys["w"] || keys["z"]) player.y -= player.speed;
+    if (keys["s"]) player.y += player.speed;
+    if (keys["a"] || keys["q"]) player.x -= player.speed;
+    if (keys["d"]) player.x += player.speed;
+
+    // Update bullets
+    bullets.forEach(b => {
+      b.x += b.dx;
+      b.y += b.dy;
+    });
+
+    // Update enemies
+    enemies.forEach(e => {
+      const angle = Math.atan2(player.y - e.y, player.x - e.x);
+      e.x += Math.cos(angle) * e.speed;
+      e.y += Math.sin(angle) * e.speed;
+    });
+
+    // Check if player is inside the zone
+    const distZone = Math.hypot(player.x - zone.x, player.y - zone.y);
+    if (distZone > zone.radius) player.life -= 0.5;
+
+    // Check bullet collisions with enemies
+    bullets.forEach((b, bi) => {
+      enemies.forEach((e, ei) => {
+        const dist = Math.hypot(b.x - e.x, b.y - e.y);
+        if (dist < e.size) {
+          bullets.splice(bi, 1);
+          enemies.splice(ei, 1);
+          score++;
+        }
+      });
+    });
+
+    // Update HUD
+    document.getElementById("life").textContent = Math.max(0, player.life.toFixed(0));
+    document.getElementById("score").textContent = score;
+    document.getElementById("zoneRadius").textContent = Math.round(zone.radius);
+    document.getElementById("time").textContent = Math.floor(score / 10);
+
+    // Check Game Over
+    if (player.life <= 0) gameOver();
+  }
+}
+
+// Game Over function
+function gameOver() {
+  running = false;
+  document.getElementById("gameover").classList.remove("hidden");
+}
+
+// Draw everything on the canvas
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // Draw zone
+  ctx.strokeStyle = "rgba(255,0,0,0.5)";
+  ctx.beginPath();
+  ctx.arc(zone.x, zone.y, zone.radius, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // Draw player
+  ctx.fillStyle = "#6366f1";
+  ctx.beginPath();
+  ctx.arc(player.x, player.y, player.size, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Draw bullets
+  ctx.fillStyle = "yellow";
+  bullets.forEach(b => {
+    ctx.beginPath();
+    ctx.arc(b.x, b.y, 3, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  // Draw enemies
+  ctx.fillStyle = "red";
+  enemies.forEach(e => {
+    ctx.beginPath();
+    ctx.arc(e.x, e.y, e.size, 0, Math.PI * 2);
+    ctx.fill();
+  });
+}
+
+// Game loop
+function loop() {
+  update();
+  draw();
+  requestAnimationFrame(loop);
+}
